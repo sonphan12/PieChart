@@ -3,13 +3,8 @@ package com.example.piechart
 import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
-import android.view.MotionEvent
 import android.view.View
-import android.widget.Toast
-import java.util.*
-import kotlin.math.cos
 import kotlin.math.min
-import kotlin.math.sin
 
 class PieChart @JvmOverloads constructor(
     context: Context,
@@ -17,13 +12,13 @@ class PieChart @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private val ratios: MutableList<Float> = mutableListOf()
     private var radius: Float = UNSPECIFIED
     private val strokePaint: Paint by lazy {
         createStrokePaint()
     }
     private var center: Point? = null
     private val oval = RectF()
+    private val slices: MutableList<Slice> = ArrayList()
 
     private fun createStrokePaint(): Paint =
         Paint().apply {
@@ -37,33 +32,40 @@ class PieChart @JvmOverloads constructor(
             radius = min(width, height).toFloat() / 2
             center = Point(radius.toInt(), radius.toInt())
         }
-        for (i in 0 until ratios.size) {
-            drawSlice(
-                canvas,
-                ratioToDegree(ratios[i]),
-                ratioToDegree(ratios.take(i).fold(0f) { acc, ratio -> acc + ratio })
-            )
-        }
+        slices.forEach { drawSlice(canvas, it) }
     }
 
-    private fun drawSlice(canvas: Canvas, angle: Float, angleOffset: Float) {
+    private fun drawSlice(canvas: Canvas, slice: Slice) {
         oval.set(
             strokePaint.strokeWidth,
             strokePaint.strokeWidth,
             radius * 2 - strokePaint.strokeWidth,
             radius * 2 - strokePaint.strokeWidth
         )
-        canvas.drawArc(oval, angleOffset, angle, true, strokePaint)
+        slice.draw(oval, canvas, strokePaint)
     }
 
     fun setRatios(ratios: List<Float>) {
         validateRatios(ratios)
-        this.ratios.run {
+        this.slices.run {
             clear()
-            addAll(ratios)
+            addAll(toSlice(ratios))
         }
         invalidate()
         requestLayout()
+    }
+
+    private fun toSlice(ratios: List<Float>): List<Slice> {
+        val slices = ArrayList<Slice>()
+        for (i in ratios.indices) {
+            slices.add(
+                Slice(
+                    ratioToDegree(ratios.take(i).fold(0f) { acc, ratio -> acc + ratio }),
+                    ratioToDegree(ratios[i])
+                )
+            )
+        }
+        return slices
     }
 
     private fun validateRatios(ratios: List<Float>) {
@@ -89,6 +91,7 @@ class PieChart @JvmOverloads constructor(
             val count = canvas.save()
             canvas.drawArc(oval, startAngle, sweepAngle, true, paint)
             canvas.restoreToCount(count)
+            paint.color = oldColor
         }
     }
 }
